@@ -1,0 +1,37 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      # Keeps LibreOffice's transient cache/config writable for its
+      # non-root container user.
+      XDG_CACHE_HOME: /tmp
+      XDG_CONFIG_HOME: /tmp
+    volumes:
+      - docflex_uploads:/app/uploads
+      - docflex_converted:/app/converted
+    expose:
+      - "7000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7000/health')"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "${DOCFLEX_PORT:-80}:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+
+volumes:
+  docflex_uploads:
+  docflex_converted:

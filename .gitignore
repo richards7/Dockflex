@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+backend/venv/
+
+# Runtime conversion artifacts
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/converted/*
+!backend/converted/.gitkeep
+
+# Local configuration and editor files
+.env
+.vscode/
+.idea/
+.agents/
+.codex/
+
+# Jenkins/Docker workspace artifacts
+*.log

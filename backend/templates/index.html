@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#3157d5">
+    <meta name="description" content="Convert documents and images to PDF in seconds.">
+    <title>DocFlex — simple PDF conversion</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <main class="page-shell">
+        <section class="hero" aria-labelledby="page-title">
+            <div class="brand"><span class="brand-mark">D</span> DocFlex</div>
+            <p class="eyebrow">DOCUMENT CONVERSION, SIMPLIFIED</p>
+            <h1 id="page-title">Your documents,<br><em>ready to share.</em></h1>
+            <p class="intro">Convert Word documents, spreadsheets, images and PDFs into polished, portable PDF files.</p>
+            <div class="format-list" aria-label="Supported formats">
+                <span>DOCX</span><span>XLSX</span><span>PDF</span><span>JPG</span><span>PNG</span>
+            </div>
+        </section>
+
+        <section class="converter-card" aria-labelledby="converter-title">
+            <div class="card-heading">
+                <p class="step">01 / CONVERT A FILE</p>
+                <h2 id="converter-title">Drop in your document</h2>
+                <p>Up to 50 MB. Your converted PDF downloads automatically.</p>
+            </div>
+            <form id="uploadForm" novalidate>
+                <input id="fileInput" name="file" type="file" accept=".docx,.xlsx,.pdf,.jpg,.jpeg,.png" hidden>
+                <label class="drop-zone" id="dropZone" for="fileInput">
+                    <span class="upload-icon" aria-hidden="true">↑</span>
+                    <strong id="dropTitle">Choose a file or drag it here</strong>
+                    <span id="dropHint">DOCX, XLSX, PDF, JPG or PNG</span>
+                </label>
+                <div class="file-details" id="fileDetails" hidden>
+                    <span class="file-icon">↗</span>
+                    <span class="file-name" id="fileName"></span>
+                    <button class="clear-file" id="clearFile" type="button" aria-label="Remove selected file">×</button>
+                </div>
+                <button class="convert-button" id="convertBtn" type="submit" disabled>
+                    <span id="buttonText">Convert to PDF</span><span aria-hidden="true">→</span>
+                </button>
+            </form>
+            <p class="status" id="message" role="status" aria-live="polite"></p>
+            <p class="privacy-note">Files are processed for conversion and are not stored as part of an account.</p>
+        </section>
+    </main>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

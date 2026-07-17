@@ -1,0 +1,11 @@
+.git
+.agents
+.codex
+**/__pycache__
+**/*.py[cod]
+backend/venv
+backend/uploads
+backend/converted
+frontend
+*.log
+.env
