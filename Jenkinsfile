@@ -1,5 +1,7 @@
 pipeline {
-    agent any
+    agent {
+        label 'docker-agent'
+    }
 
     options {
         timestamps()
@@ -7,86 +9,108 @@ pipeline {
         skipDefaultCheckout(true)
     }
 
-    parameters {
-        string(
-            name: 'DOCKERHUB_IMAGE',
-            defaultValue: 'richards7/dockflex',
-            description: 'Docker Hub repository, formatted as namespace/image.'
-        )
-        booleanParam(
-            name: 'PUSH_TO_DOCKERHUB',
-            defaultValue: true,
-            description: 'Push verified main/master builds to Docker Hub.'
-        )
-    }
-
     environment {
+        AWS_REGION = 'us-east-1'
+        AWS_ACCOUNT_ID = '054043816989'
+        ECR_REPOSITORY = 'dockflex'
+
+        ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+        IMAGE_NAME = "${ECR_REGISTRY}/${ECR_REPOSITORY}"
+
         CANDIDATE_IMAGE = "dockflex-ci:${BUILD_NUMBER}"
-        TEST_CONTAINER = "dockflex-ci-${BUILD_NUMBER}"
+        TEST_CONTAINER = "dockflex-test-${BUILD_NUMBER}"
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Validate configuration') {
+        stage('Validate Docker Compose') {
             steps {
                 sh 'docker compose config -q'
             }
         }
 
-        stage('Build candidate image') {
+        stage('Build Docker Image') {
             steps {
-                sh 'docker build --pull --tag "$CANDIDATE_IMAGE" .'
+                sh '''
+                    docker build \
+                      --pull \
+                      -t ${CANDIDATE_IMAGE} .
+                '''
             }
         }
 
-        stage('Test candidate image') {
+        stage('Run Unit Tests') {
             steps {
-                sh '''#!/bin/sh
-                    set -eu
-                    docker run --name "$TEST_CONTAINER" "$CANDIDATE_IMAGE" \
+                sh '''
+                    docker run --rm \
+                      --name ${TEST_CONTAINER} \
+                      ${CANDIDATE_IMAGE} \
                       python -m unittest discover -s tests -v
                 '''
             }
         }
 
-        stage('Push verified image to Docker Hub') {
-            when {
-                expression {
-                    return params.PUSH_TO_DOCKERHUB &&
-                        (!env.BRANCH_NAME || env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'master')
-                }
-            }
+        stage('Authenticate to AWS ECR') {
+
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-credentials',
-                    usernameVariable: 'DOCKERHUB_USERNAME',
-                    passwordVariable: 'DOCKERHUB_TOKEN'
-                )]) {
-                    sh '''#!/bin/sh
-                        set -eu
-                        echo "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
-                        docker tag "$CANDIDATE_IMAGE" "$DOCKERHUB_IMAGE:${BUILD_NUMBER}"
-                        docker tag "$CANDIDATE_IMAGE" "$DOCKERHUB_IMAGE:latest"
-                        docker push "$DOCKERHUB_IMAGE:${BUILD_NUMBER}"
-                        docker push "$DOCKERHUB_IMAGE:latest"
-                        docker logout
+
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-credentials'
+                ]]) {
+
+                    sh '''
+                        aws ecr get-login-password \
+                        --region ${AWS_REGION} | docker login \
+                        --username AWS \
+                        --password-stdin ${ECR_REGISTRY}
                     '''
                 }
             }
         }
+
+        stage('Push Image to ECR') {
+
+            steps {
+
+                sh '''
+
+                    docker tag ${CANDIDATE_IMAGE} ${IMAGE_NAME}:${BUILD_NUMBER}
+
+                    docker tag ${CANDIDATE_IMAGE} ${IMAGE_NAME}:latest
+
+                    docker push ${IMAGE_NAME}:${BUILD_NUMBER}
+
+                    docker push ${IMAGE_NAME}:latest
+
+                '''
+            }
+
+        }
+
     }
 
     post {
+
         always {
-            sh '''#!/bin/sh
-                docker rm -f "$TEST_CONTAINER" >/dev/null 2>&1 || true
-                docker image rm "$CANDIDATE_IMAGE" >/dev/null 2>&1 || true
+
+            sh '''
+
+                docker rm -f ${TEST_CONTAINER} >/dev/null 2>&1 || true
+
+                docker image rm ${CANDIDATE_IMAGE} >/dev/null 2>&1 || true
+
             '''
+
         }
+
     }
+
 }
