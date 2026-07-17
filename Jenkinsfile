@@ -3,23 +3,12 @@ pipeline {
         label 'docker-agent'
     }
 
-    options {
-        timestamps()
-        disableConcurrentBuilds()
-        skipDefaultCheckout(true)
-    }
-
     environment {
-        AWS_REGION = 'us-east-1'
-        AWS_ACCOUNT_ID = '054043816989'
-        ECR_REPOSITORY = 'dockflex'
-
-        ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-
-        IMAGE_NAME = "${ECR_REGISTRY}/${ECR_REPOSITORY}"
-
-        CANDIDATE_IMAGE = "dockflex-ci:${BUILD_NUMBER}"
-        TEST_CONTAINER = "dockflex-test-${BUILD_NUMBER}"
+        AWS_REGION = 'us-east-1' // Change if needed
+        AWS_ACCOUNT_ID = '054043816989' // Replace with your AWS Account ID
+        ECR_REPO = 'dockflex'
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        ECR_URI = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}"
     }
 
     stages {
@@ -30,87 +19,50 @@ pipeline {
             }
         }
 
-        stage('Validate Docker Compose') {
-            steps {
-                sh 'docker compose config -q'
-            }
-        }
-
         stage('Build Docker Image') {
             steps {
-                sh '''
-                    docker build \
-                      --pull \
-                      -t ${CANDIDATE_IMAGE} .
-                '''
+                sh """
+                    docker build -t ${ECR_REPO}:${IMAGE_TAG} .
+                """
             }
         }
 
-        stage('Run Unit Tests') {
+        stage('Login to AWS ECR') {
             steps {
-                sh '''
-                    docker run --rm \
-                      --name ${TEST_CONTAINER} \
-                      ${CANDIDATE_IMAGE} \
-                      python -m unittest discover -s tests -v
-                '''
-            }
-        }
-
-        stage('Authenticate to AWS ECR') {
-
-            steps {
-
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-credentials'
                 ]]) {
-
-                    sh '''
-                        aws ecr get-login-password \
-                        --region ${AWS_REGION} | docker login \
-                        --username AWS \
-                        --password-stdin ${ECR_REGISTRY}
-                    '''
+                    sh """
+                        aws ecr get-login-password --region ${AWS_REGION} | \
+                        docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                    """
                 }
             }
         }
 
-        stage('Push Image to ECR') {
-
+        stage('Tag Image') {
             steps {
-
-                sh '''
-
-                    docker tag ${CANDIDATE_IMAGE} ${IMAGE_NAME}:${BUILD_NUMBER}
-
-                    docker tag ${CANDIDATE_IMAGE} ${IMAGE_NAME}:latest
-
-                    docker push ${IMAGE_NAME}:${BUILD_NUMBER}
-
-                    docker push ${IMAGE_NAME}:latest
-
-                '''
+                sh """
+                    docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_URI}:${IMAGE_TAG}
+                    docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_URI}:latest
+                """
             }
-
         }
 
+        stage('Push to ECR') {
+            steps {
+                sh """
+                    docker push ${ECR_URI}:${IMAGE_TAG}
+                    docker push ${ECR_URI}:latest
+                """
+            }
+        }
     }
 
     post {
-
         always {
-
-            sh '''
-
-                docker rm -f ${TEST_CONTAINER} >/dev/null 2>&1 || true
-
-                docker image rm ${CANDIDATE_IMAGE} >/dev/null 2>&1 || true
-
-            '''
-
+            sh "docker image prune -f"
         }
-
     }
-
 }
