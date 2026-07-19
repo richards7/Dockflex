@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: dockflex
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: dockflex
+
+  template:
+    metadata:
+      labels:
+        app: dockflex
+
+    spec:
+      containers:
+      - name: dockflex
+        image: 054043816989.dkr.ecr.us-east-1.amazonaws.com/dockflex:latest
+        imagePullPolicy: Always
+
+        ports:
+        - containerPort: 7000

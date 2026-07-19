@@ -1,6 +1,7 @@
 Flask
 Flask-Cors
 Pillow
+img2pdf
 Werkzeug
 python-docx
 gunicorn
